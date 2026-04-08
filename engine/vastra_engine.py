@@ -1,7 +1,7 @@
 import modal
-from modal import Image, Volume, Stub
+from modal import Image, Volume, App
 
-stub = Stub("vastra-engine")
+app = App("vastra-engine")
 idm_vton_weights = Volume.from_name("idm_vton_weights", create_if_missing=True)
 
 def download_model():
@@ -22,7 +22,7 @@ vton_image = (
     .run_function(download_model, volumes={"/weights": idm_vton_weights})
 )
 
-@stub.cls(
+@app.cls(
     gpu="L4",
     image=vton_image,
     volumes={"/weights": idm_vton_weights},
@@ -33,14 +33,12 @@ class VastraModel:
         import torch
         from diffusers import StableDiffusionXLImg2ImgPipeline, EulerDiscreteScheduler
         
-        # Load in FP16 for stability; FP8 can be complex in generic environments
         self.pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
             "/weights",
             torch_dtype=torch.float16, 
             use_safetensors=True
         ).to("cuda")
         
-        # Use SDXL-Lightning scheduler for fast inference
         self.pipe.scheduler = EulerDiscreteScheduler.from_config(
             self.pipe.scheduler.config, 
             timestep_spacing="trailing"
@@ -48,7 +46,6 @@ class VastraModel:
 
     @modal.method()
     def process_tryon(self, human_img_url, garment_img_url):
-        # 15 inference steps as requested for <12s processing
         image = self.pipe(
             prompt="high quality virtual try-on",
             num_inference_steps=15,
@@ -56,7 +53,7 @@ class VastraModel:
         ).images[0]
         return image
 
-@stub.function()
+@app.function()
 @modal.asgi_app()
 def gradio_api():
     import gradio as gr
