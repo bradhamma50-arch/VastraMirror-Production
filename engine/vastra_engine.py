@@ -4,6 +4,10 @@ from modal import Image, Volume, Stub
 stub = Stub("vastra-engine")
 idm_vton_weights = Volume.from_name("idm_vton_weights", create_if_missing=True)
 
+def download_model():
+    from huggingface_hub import snapshot_download
+    snapshot_download("yisol/IDM-VTON", local_dir="/weights")
+
 vton_image = (
     Image.debian_slim()
     .pip_install(
@@ -13,16 +17,9 @@ vton_image = (
         "accelerate",
         "huggingface_hub",
         "gradio",
-        "gradio_client",
-        "torchao"
+        "gradio_client"
     )
-    .run_function(
-        lambda: (
-            from huggingface_hub import snapshot_download
-            snapshot_download("yisol/IDM-VTON", local_dir="/weights")
-        ),
-        volumes={"/weights": idm_vton_weights}
-    )
+    .run_function(download_model, volumes={"/weights": idm_vton_weights})
 )
 
 @stub.cls(
@@ -36,8 +33,7 @@ class VastraModel:
         import torch
         from diffusers import StableDiffusionXLImg2ImgPipeline, EulerDiscreteScheduler
         
-        # Load in FP8 as requested to save VRAM and increase speed
-        # Using torchao or similar for FP8 if available, or just float16 for stability
+        # Load in FP16 for stability; FP8 can be complex in generic environments
         self.pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
             "/weights",
             torch_dtype=torch.float16, 
