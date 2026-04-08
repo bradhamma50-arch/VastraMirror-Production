@@ -1,15 +1,15 @@
 import modal
 from modal import Image, Volume, App
 
-app = App("vastra-engine")
-idm_vton_weights = Volume.from_name("idm_vton_weights", create_if_missing=True)
+app = modal.App("vastra-engine")
+idm_vton_weights = modal.Volume.from_name("idm_vton_weights", create_if_missing=True)
 
 def download_model():
     from huggingface_hub import snapshot_download
     snapshot_download("yisol/IDM-VTON", local_dir="/weights")
 
 vton_image = (
-    Image.debian_slim()
+    modal.Image.debian_slim()
     .pip_install(
         "torch",
         "diffusers",
@@ -26,7 +26,7 @@ vton_image = (
     gpu="L4",
     image=vton_image,
     volumes={"/weights": idm_vton_weights},
-    container_idle_timeout=300
+    scaledown_window=300
 )
 class VastraModel:
     def __enter__(self):
